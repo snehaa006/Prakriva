@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "ayurvedicdietchart",
+  "private_key_id": "74d423b3defd823aaf6e9b41f95209158c40a5f5",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCeiHj97nygCzvG\nMSOv/5STp7+s5Z+LUcO2CARGPVoKi6Dh7F7+PskPVkzwnWMwQTcmWOBJGYzduKd8\nl0BvdP5MjQBdaXdXgBozAYPAyU7GJUdfurma7R7UctvSp0Kk+cD7Cd4+eyVm8V6Z\nubbksvNa9eKn10HyDSXQOO8iqYs+tMd9dES01Phnv7UyAf+PA13MCDcH+my8UUaV\nX92cWf11bRflBzz4o6bihLHQObDVGlKZQVTTGgzmDpE9ghV+eU3Af+8E9x7TGQJ7\nIOlb35u6i4JlsMlTL0DFukk0oZGjFWRJ9Xd5YzdhweIXYENI+DkUR/OyTpTVVnr2\nsA3tcyujAgMBAAECggEABz4Q2Pj2NJGOz4UbLkUs0noNZaav3TuFB2HiYBsZa/Xp\nCak0xcS0hsDYjv2BtIimLlhNFsnWB6MR870tMmpT28dtRtc0noi5qa7eCAaqVJ8L\nXbI4HH3MtMPyivMdNlA6or1Wq+AQW12XhspXMqeCOpuVGTnaR2aWXabcNecs91ZU\nfl5AtO3wXvgyKojfI/T9r22ddTwW8ix+2GpYMp0LvQz8XS3ROndah4qA2lY+avvY\nBp09x5CnixC5CBdrQO3JfSnWu3XJxHLWVsBPxuvVAoIuyarOmGzG0PKFD9LLuQZc\nhcUdODZNEDlAzar5hyZyGMEGax/Y0709uF/xNkDwUQKBgQDVtnc8FFLm3FtlF2Ge\nEtlTUsgjGIh1Jmc6+OfOZGb3/qnGtnfIApHYH29/qgUwnD9NXr5Ube8sBYSVqpgc\ne5QzGnGhYVpTH/V3DAdBfiSqUhPBtw5xDshrMOzakpg8wSWe6SJ2wW/n2Xa/JYR2\nR1RAsr3jLODx063V54a2/+CZLQKBgQC95uc5Q2yUzS6E4hrZzeUnribdI9ABpxAX\n2I/yv8t8/aB7PGWGYT4DhvhuyRUkSRQ41YIc4nrQ04UD4jk0qeGl8ICLxnQpZGxT\nuGhGSSg5M9276CCyoB21HPtuxk1ujJiYZEaFIwr4yT/u4R5kVqJTFYP6nos5s1S5\nyLwZsK46DwKBgBB4lqn3uwf19clNywU+2KcWWzxxOJsm0Y/2/Q6oKFN2uikJiSPO\nJuVsTtCdDvdXI33YDn09V9ChwD00v7J6R8rEf/t7IFYFwYpiT/DZQwQpfUJR1Hgc\nNpAkXizeXYNZM4gS2cgjUnehCAjlYFcpWjH+VKo8nD2nHd+9j2FtSSclAoGAYpPO\nS6d4YfXwxAIrNgzve52nhvvkKjdy3y4H61csZoGyIMbFXPB1pJcXt0qisudMnAQZ\nOq1GW8ixL8brMy9MdztVPzmRazs6EGuVlYa8XpVR8Q0ajB8ZzL5ytpox78UEIXdM\nNChwtZyil3o8sJFYShDNJffPBfDVdmuBWUSh7HkCgYBoeod+i+Nqgu8848NGP2ij\nyhKcNkDzHQ1XrLQHfuTtqj2eolblxYrJ9PBezwlAFP9QfwKVNGp3aHC0v7XGyxea\nGBHNbFyddLuZgEWAUiIZRHiZ3vBemgAfxCxfs3pt0QAAAMvIvN9qSk6WtR/uxus9\nMs/YBASxNuC8CIjYWNcgQg==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@ayurvedicdietchart.iam.gserviceaccount.com",
+  "client_id": "107111699879675828042",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ayurvedicdietchart.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
