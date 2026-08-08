@@ -28,6 +28,7 @@ import RecipeBuilder from "./pages/doctor/RecipeBuilder";
 import DietChart from "./pages/doctor/DietChart";
 import NotFound from "./pages/NotFound";
 import Questionnaire from "./pages/patient/Questionnaire";
+import MaternalHealth from "./pages/patient/MaternalHealth";
 import PatientProfile from "./pages/patient/PatientProfile";
 import Reminders from "./pages/patient/Reminders";
 import Settings from "./pages/patient/Settings";
@@ -144,6 +145,7 @@ const AppRoutes = () => (
       >
         <Route path="dashboard" element={<PatientDashboard />} />
         <Route path="meal-logging" element={<MealLogging />} />
+        <Route path="maternal-health" element={<MaternalHealth />} />
         {/* <Route path="symptom-tracking" element={<SymptomTracking />} /> */}
         <Route path="lifestyle-tracker" element={<LifestyleTracker />} />
         <Route path="social-support" element={<SocialSupport />} />

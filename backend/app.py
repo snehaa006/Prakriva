@@ -18,11 +18,13 @@ import traceback
 # Import our modules
 from config import settings
 from models import (
-    UserProfile, MealPlanRequest, MealPlanResponse, 
-    APIResponse, HealthCheck, DoshaResult
+    UserProfile, MealPlanRequest, MealPlanResponse,
+    APIResponse, HealthCheck, DoshaResult,
+    MaternalAssessmentRequest
 )
 from dataset_loader import dataset_loader
 from dosha_estimator import dosha_predictor
+from maternal_anemia import maternal_predictor
 from calorie_calculator import estimate_calories, get_calorie_breakdown
 from planner import meal_planner
 from db import db_manager
@@ -39,7 +41,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     
     # Configure CORS
-    CORS(app, origins=["http://localhost:3000", "https://yourdomain.com"])
+    CORS(app, origins=settings.CORS_ORIGINS)
     
     # Configure rate limiting
     limiter = Limiter(
@@ -226,7 +228,8 @@ def health_check():
             dependencies={
                 "database": db_status.get("status", "unknown"),
                 "datasets": dataset_status.get("status", "unknown"),
-                "ml_model": ml_status.get("status", "unknown")
+                "ml_model": ml_status.get("status", "unknown"),
+                "maternal_model": "healthy" if maternal_predictor.is_ready else "warning"
             }
         )
         
@@ -590,6 +593,50 @@ def predict_dosha_only():
     except Exception as e:
         logger.error(f"Dosha prediction failed: {e}")
         raise DoshaPredictionError(f"Dosha prediction failed: {e}")
+
+
+@app.route("/maternal/predict", methods=["POST"])
+@app.limiter.limit("20 per minute")
+def predict_maternal_risk():
+    """
+    Maternal anemia status + pregnancy risk from routine antenatal inputs.
+
+    Age and height are reused from the onboarding profile; weight, gestational
+    week, hemoglobin, iron supplement and blood pressure come from the visit form.
+    """
+    try:
+        if not request.is_json:
+            raise ValidationError("Content-Type must be application/json")
+
+        try:
+            assessment = MaternalAssessmentRequest(**request.json)
+        except Exception as e:
+            raise ValidationError(f"Invalid maternal assessment input: {str(e)}")
+
+        payload = assessment.model_dump(exclude_none=True)
+        patient_id = payload.pop("Patient_ID", None)
+        if "Iron_Supplement" in payload:
+            payload["Iron_Supplement"] = payload["Iron_Supplement"].value
+
+        try:
+            result = maternal_predictor.predict(payload)[0]
+        except FileNotFoundError as e:
+            raise ModelError(str(e))
+
+        if patient_id:
+            result["patient_id"] = patient_id
+
+        return jsonify(APIResponse(
+            success=True,
+            data=result,
+            message="Maternal anemia status and pregnancy risk predicted successfully"
+        ).dict())
+
+    except (ValidationError, ModelError) as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Maternal risk prediction failed: {e}")
+        raise ModelError(f"Maternal risk prediction failed: {e}")
 
 
 @app.route("/calories/calculate", methods=["POST"])

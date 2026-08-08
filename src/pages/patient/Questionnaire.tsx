@@ -15,14 +15,31 @@ import {
   Check,
   Sparkles,
   Circle,
+  Baby,
 } from "lucide-react";
+
+import {
+  ageFromDob,
+  bmiCategory,
+  calcBmi,
+  gestationalWeekFromLmp,
+  trimesterOf,
+} from "@/lib/health";
 
 interface FormData {
   // Personal Information
+  // dob, heightCm and weightKg are reused later (age + BMI for the maternal
+  // anemia model), so they are captured once here.
   name: string;
   dob: string;
   gender: string;
   location: string;
+  heightCm: string;
+  weightKg: string;
+
+  // Pregnancy (drives the maternal anemia & pregnancy-risk check)
+  isPregnant: string;
+  lmpDate: string;
 
   // Lifestyle & Habits
   dailyRoutine: string;
@@ -71,6 +88,10 @@ const AyurvedicHealthAssessment: React.FC = () => {
     dob: "",
     gender: "",
     location: "",
+    heightCm: "",
+    weightKg: "",
+    isPregnant: "",
+    lmpDate: "",
     dailyRoutine: "",
     physicalActivity: "",
     sleepDuration: "",
@@ -102,6 +123,11 @@ const AyurvedicHealthAssessment: React.FC = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [waterValue, setWaterValue] = useState("2.0L");
+
+  // Derived once here, reused by the maternal anemia check.
+  const age = ageFromDob(formData.dob);
+  const bmi = calcBmi(formData.weightKg, formData.heightCm);
+  const gestationalWeek = gestationalWeekFromLmp(formData.lmpDate);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -182,6 +208,16 @@ const AyurvedicHealthAssessment: React.FC = () => {
         questionnaireCompleted: true,
         assessmentData: formData,
         assessmentCompletedAt: new Date().toISOString(),
+        // Flat copies so other features (maternal anemia check, diet planner)
+        // can read them without re-parsing the whole assessment.
+        dob: formData.dob,
+        gender: formData.gender,
+        age,
+        heightCm: formData.heightCm ? parseFloat(formData.heightCm) : null,
+        weightKg: formData.weightKg ? parseFloat(formData.weightKg) : null,
+        bmi,
+        isPregnant: formData.isPregnant === "yes",
+        lmpDate: formData.lmpDate || null,
       });
   
       // Update context state
@@ -399,6 +435,95 @@ const AyurvedicHealthAssessment: React.FC = () => {
                   placeholder="E.g., San Francisco, CA"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Height (cm)
+                </label>
+                <input
+                  type="number"
+                  name="heightCm"
+                  min="100"
+                  max="220"
+                  step="0.5"
+                  value={formData.heightCm}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="E.g., 158"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Asked once — reused for your BMI in later health checks.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current weight (kg)
+                </label>
+                <input
+                  type="number"
+                  name="weightKg"
+                  min="25"
+                  max="200"
+                  step="0.1"
+                  value={formData.weightKg}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="E.g., 54"
+                />
+                {bmi !== null && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    BMI: <span className="font-semibold">{bmi}</span> ({bmiCategory(bmi)})
+                    {age !== null && ` · Age: ${age} yrs`}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Pregnancy */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <Baby className="w-6 h-6 text-green-700" />
+              <h2 className="text-xl font-semibold text-gray-800">Pregnancy</h2>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Are you currently pregnant?
+                </label>
+                <RadioGroup
+                  name="isPregnant"
+                  options={[
+                    { value: "yes", label: "Yes" },
+                    { value: "no", label: "No" },
+                    { value: "planning", label: "Planning / trying" },
+                  ]}
+                />
+              </div>
+
+              {formData.isPregnant === "yes" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First day of your last menstrual period (LMP)
+                  </label>
+                  <input
+                    type="date"
+                    name="lmpDate"
+                    value={formData.lmpDate}
+                    onChange={handleInputChange}
+                    className="w-full md:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  {gestationalWeek !== null && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      About <span className="font-semibold">week {gestationalWeek}</span> of
+                      pregnancy ({trimesterOf(gestationalWeek)}). Used to pre-fill your
+                      anemia &amp; pregnancy-risk check.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

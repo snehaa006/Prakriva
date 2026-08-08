@@ -19,6 +19,16 @@ class Settings:
         self.HOST = os.getenv("HOST", "0.0.0.0")
         self.PORT = int(os.getenv("PORT", 5001))
         
+        # Allowed browser origins (comma-separated); defaults cover local dev
+        self.CORS_ORIGINS = [
+            origin.strip()
+            for origin in os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:3000,http://localhost:5173,http://localhost:8080",
+            ).split(",")
+            if origin.strip()
+        ]
+
         # API Keys
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
         self.FIREBASE_KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "firebase_key.json")

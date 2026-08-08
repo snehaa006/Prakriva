@@ -1,8 +1,9 @@
 """
 Pydantic models for request/response validation (Pydantic v2)
 """
+import re
 from typing import Dict, List, Optional, Union, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 
 
@@ -77,6 +78,72 @@ class UserProfile(BaseModel):
     def BMI(self) -> float:
         """Calculate BMI"""
         return round(self.Weight_kg / (self.Height_cm / 100) ** 2, 2)
+
+
+class YesNoEnum(str, Enum):
+    YES = "Yes"
+    NO = "No"
+
+
+class MaternalAssessmentRequest(BaseModel):
+    """
+    Inputs for the maternal anemia / pregnancy-risk models.
+
+    Age and height come from the profile captured at onboarding (date of birth
+    and height); weight and the clinical readings are captured at every visit.
+    Anemia status and pregnancy risk are model outputs and are never sent in.
+    """
+
+    Patient_ID: Optional[str] = Field(None, description="Unique patient identifier")
+
+    # Carried over from the onboarding profile
+    Age: Optional[int] = Field(None, ge=10, le=60, description="Age in years")
+    Date_of_Birth: Optional[str] = Field(
+        None, description="ISO date of birth; used to derive Age when Age is absent"
+    )
+    Height_cm: Optional[float] = Field(None, ge=100, le=220, description="Height in cm")
+
+    # Captured at every antenatal visit
+    Weight_kg: Optional[float] = Field(None, ge=25, le=200, description="Current weight in kg")
+    BMI: Optional[float] = Field(None, ge=10, le=60, description="BMI, if already known")
+    Gestational_Week: int = Field(..., ge=1, le=42, description="Weeks of gestation")
+    Hemoglobin_g_dL: float = Field(..., ge=2, le=20, description="Hemoglobin in g/dL")
+    Iron_Supplement: YesNoEnum = Field(..., description="Currently taking iron supplements")
+    Systolic_BP: Optional[int] = Field(None, ge=60, le=250, description="Systolic blood pressure")
+    Diastolic_BP: Optional[int] = Field(None, ge=30, le=160, description="Diastolic blood pressure")
+    Blood_Pressure: Optional[str] = Field(
+        None, description="Blood pressure as 'systolic/diastolic', e.g. '118/76'"
+    )
+
+    @field_validator("Blood_Pressure")
+    def validate_bp_format(cls, v):
+        if v and not re.match(r"^\s*\d{2,3}\s*/\s*\d{2,3}\s*$", v):
+            raise ValueError("Blood_Pressure must look like '118/76'")
+        return v
+
+    @model_validator(mode="after")
+    def validate_required_combinations(self):
+        if self.Age is None and not self.Date_of_Birth:
+            raise ValueError("Provide either Age or Date_of_Birth")
+        if self.BMI is None and (self.Weight_kg is None or self.Height_cm is None):
+            raise ValueError("Provide either BMI, or both Weight_kg and Height_cm")
+        if not self.Blood_Pressure and (self.Systolic_BP is None or self.Diastolic_BP is None):
+            raise ValueError(
+                "Provide either Blood_Pressure ('118/76'), or both Systolic_BP and Diastolic_BP"
+            )
+        return self
+
+
+class MaternalAssessmentResult(BaseModel):
+    anemia_status: str = Field(..., description="Normal / Mild / Moderate / Severe")
+    anemia_confidence: float = Field(..., ge=0, le=1)
+    anemia_probabilities: Dict[str, float] = Field(...)
+    pregnancy_risk: str = Field(..., description="Low / Medium / High")
+    risk_confidence: float = Field(..., ge=0, le=1)
+    risk_probabilities: Dict[str, float] = Field(...)
+    features_used: Dict[str, Optional[float]] = Field(
+        ..., description="Numeric features the models actually saw"
+    )
 
 
 class MealPlanRequest(BaseModel):

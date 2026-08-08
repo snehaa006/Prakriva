@@ -24,7 +24,8 @@ import {
   ChefHat,
   Activity,
   Users,
-  Stethoscope
+  Stethoscope,
+  Baby
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
@@ -48,6 +49,11 @@ const navigationItems = [
     title: "Meal Logging",
     url: "/patient/meal-logging",
     icon: ChefHat,
+  },
+  {
+    title: "Maternal Health",
+    url: "/patient/maternal-health",
+    icon: Baby,
   },
   // {
   //   title: "Symptom Tracking",

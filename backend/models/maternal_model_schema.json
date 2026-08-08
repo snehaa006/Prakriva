@@ -1,0 +1,35 @@
+{
+  "feature_columns": [
+    "Age",
+    "Gestational_Week",
+    "Hemoglobin_g_dL",
+    "Iron_Supplement",
+    "Systolic_BP",
+    "Diastolic_BP",
+    "MAP",
+    "Pulse_Pressure",
+    "BMI"
+  ],
+  "feature_defaults": {
+    "Age": 25.0,
+    "Gestational_Week": 26.0,
+    "Hemoglobin_g_dL": 11.2,
+    "Iron_Supplement": 1.0,
+    "Systolic_BP": 112.0,
+    "Diastolic_BP": 70.0,
+    "MAP": 84.33333333333333,
+    "Pulse_Pressure": 41.0,
+    "BMI": 23.6
+  },
+  "anemia_labels": [
+    "Normal",
+    "Mild",
+    "Moderate",
+    "Severe"
+  ],
+  "risk_labels": [
+    "Low",
+    "Medium",
+    "High"
+  ]
+}
