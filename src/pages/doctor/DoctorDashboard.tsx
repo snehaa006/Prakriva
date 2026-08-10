@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,14 +30,14 @@ import {
   Heart
 } from 'lucide-react';
 
+const FALLBACK_DOCTOR = {
+  name: 'Dr. Arjun Sharma',
+  specialization: 'Ayurvedic Practitioner',
+  initials: 'AS',
+};
+
 const InteractiveDoctorDashboard = () => {
   const [selectedTab, setSelectedTab] = useState('today');
-  const [doctorData, setDoctorData] = useState({
-    name: 'Loading...',
-    specialization: 'Loading...',
-    initials: 'DR',
-    loading: true
-  });
   const [notifications, setNotifications] = useState([
     { id: 1, message: '3 patients need follow-up this week', type: 'warning', read: false },
     { id: 2, message: '5 new patient messages', type: 'info', read: false },
@@ -58,64 +58,27 @@ const InteractiveDoctorDashboard = () => {
       .slice(0, 2);
   };
 
-  // Function to fetch doctor data from Firebase
-  useEffect(() => {
-    const fetchDoctorData = async () => {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          try {
-            console.log('Fetching doctor data for user:', user.uid);
-            
-            // Get doctor data from Firestore
-            const doctorRef = doc(db, "doctors", user.uid);
-            const doctorSnap = await getDoc(doctorRef);
-            
-            if (doctorSnap.exists()) {
-              const data = doctorSnap.data();
-              console.log('Doctor data retrieved:', data);
-              
-              setDoctorData({
-                name: data.name || 'Dr. Unknown',
-                specialization: data.ayurvedicSpecialization?.join(', ') || 'Ayurvedic Practitioner',
-                initials: getInitials(data.name || 'Dr Unknown'),
-                loading: false
-              });
-            } else {
-              console.log('No doctor document found for user:', user.uid);
-              // Fallback to default data
-              setDoctorData({
-                name: 'Dr. Arjun Sharma',
-                specialization: 'Ayurvedic Practitioner',
-                initials: 'AS',
-                loading: false
-              });
-            }
-          } catch (error) {
-            console.error('Error fetching doctor data:', error);
-            // Fallback to default data on error
-            setDoctorData({
-              name: 'Dr. Arjun Sharma',
-              specialization: 'Ayurvedic Practitioner',
-              initials: 'AS',
-              loading: false
-            });
-          }
-        } else {
-          console.log('No authenticated user found');
-          setDoctorData({
-            name: 'Please Login',
-            specialization: 'Ayurvedic Practitioner',
-            initials: 'PL',
-            loading: false
-          });
-        }
-      });
+  // Cached per doctor, so returning to the dashboard tab shows the real name
+  // straight away instead of flashing "Loading..." while Firestore is queried.
+  const doctorId = auth.currentUser?.uid;
 
-      return () => unsubscribe();
-    };
+  const { data: doctorData = FALLBACK_DOCTOR, isPending } = useQuery({
+    queryKey: ['doctorDashboardProfile', doctorId],
+    enabled: Boolean(doctorId),
+    queryFn: async () => {
+      const doctorRef = doc(db, "doctors", doctorId!);
+      const doctorSnap = await getDoc(doctorRef);
 
-    fetchDoctorData();
-  }, []);
+      if (!doctorSnap.exists()) return FALLBACK_DOCTOR;
+
+      const data = doctorSnap.data();
+      return {
+        name: data.name || 'Dr. Unknown',
+        specialization: data.ayurvedicSpecialization?.join(', ') || 'Ayurvedic Practitioner',
+        initials: getInitials(data.name || 'Dr Unknown'),
+      };
+    },
+  });
 
   const markNotificationAsRead = (id) => {
     setNotifications(notifications.map(notif => 
@@ -432,7 +395,7 @@ const InteractiveDoctorDashboard = () => {
                 </div>
                 <div className="bg-muted p-3 rounded-lg">
                   <p className="text-sm italic text-muted-foreground">
-                    "Dr. {doctorData.loading ? 'Sharma' : doctorData.name.split(' ').pop()}'s Ayurvedic approach helped me tremendously. Very knowledgeable and caring."
+                    "Dr. {isPending ? 'Sharma' : doctorData.name.split(' ').pop()}'s Ayurvedic approach helped me tremendously. Very knowledgeable and caring."
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">- Meera K. • 2 days ago</p>
                 </div>

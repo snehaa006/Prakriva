@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,9 +46,7 @@ const ConsultDoctor: React.FC = () => {
   const navigate = useNavigate();
 
   // State management
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
@@ -69,9 +68,56 @@ const ConsultDoctor: React.FC = () => {
     minRating: ''
   });
 
-  // Load doctors and notifications on component mount
+  const loadDoctorsData = async () => {
+    const doctorsData = await fetchDoctors();
+
+    // Check for existing requests for all doctors
+    const requestChecks = await Promise.allSettled(
+      doctorsData.map(doctor => checkExistingRequest(doctor.id))
+    );
+
+    const requestedDoctorIds: string[] = [];
+    requestChecks.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        requestedDoctorIds.push(doctorsData[index].id);
+      }
+    });
+
+    return { doctors: doctorsData, requestedDoctorIds };
+  };
+
+  // The doctor directory is cached, so coming back to this tab paints the list
+  // immediately and only refreshes in the background.
+  const {
+    data,
+    isPending,
+    isFetching,
+    isError,
+    refetch: loadDoctors,
+  } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: loadDoctorsData,
+  });
+
+  const doctors = useMemo(() => data?.doctors ?? [], [data]);
+
   useEffect(() => {
-    loadDoctors();
+    if (data) setExistingRequests(new Set(data.requestedDoctorIds));
+  }, [data]);
+
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load doctors. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [isError, toast]);
+
+  // Doctors are loaded by the cached query below; only notifications need a
+  // mount-time fetch plus the periodic poll.
+  useEffect(() => {
     loadNotifications();
     
     // Check for request updates every 30 seconds
@@ -92,7 +138,15 @@ const ConsultDoctor: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, filters]);
+  }, [searchQuery, filters, doctors]);
+
+  // Show the cached list right away when nothing is being searched or filtered,
+  // rather than waiting for the debounced search to settle.
+  useEffect(() => {
+    const noSearch = !searchQuery.trim() && Object.values(filters).every(f => !f);
+    if (noSearch) setFilteredDoctors(doctors);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctors]);
 
   // LOAD NOTIFICATIONS AND POPULATE acceptedChats
   const loadNotifications = async () => {
@@ -176,37 +230,6 @@ const ConsultDoctor: React.FC = () => {
     });
   };
 
-  const loadDoctors = async () => {
-    try {
-      setLoading(true);
-      const doctorsData = await fetchDoctors();
-      setDoctors(doctorsData);
-      setFilteredDoctors(doctorsData);
-      
-      // Check for existing requests for all doctors
-      const requestChecks = await Promise.allSettled(
-        doctorsData.map(doctor => checkExistingRequest(doctor.id))
-      );
-      
-      const existingSet = new Set<string>();
-      requestChecks.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          existingSet.add(doctorsData[index].id);
-        }
-      });
-      
-      setExistingRequests(existingSet);
-    } catch (error) {
-      console.error('Error loading doctors:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load doctors. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim() && Object.values(filters).every(f => !f)) {
@@ -379,7 +402,7 @@ const ConsultDoctor: React.FC = () => {
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -473,8 +496,8 @@ const ConsultDoctor: React.FC = () => {
             )}
           </div>
           
-          <Button variant="outline" onClick={loadDoctors} disabled={loading} className="gap-2">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" onClick={() => loadDoctors()} disabled={isFetching} className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -617,7 +640,7 @@ const ConsultDoctor: React.FC = () => {
       </Card>
 
       {/* Doctors List */}
-      {filteredDoctors.length === 0 && !loading ? (
+      {filteredDoctors.length === 0 && !isPending ? (
         <Card>
           <CardContent className="p-12 text-center">
             <Stethoscope className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />

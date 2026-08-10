@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,131 +103,121 @@ interface Patient {
 
 const Patients: React.FC = () => {
   const { toast } = useToast();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const doctorId = auth.currentUser?.uid;
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [ageFilter, setAgeFilter] = useState('all');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showPatientProfile, setShowPatientProfile] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [copiedPatientId, setCopiedPatientId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      console.error('No authenticated user');
-      setIsLoading(false);
-      return;
+  const fetchAcceptedPatients = async (): Promise<Patient[]> => {
+    const requestsRef = collection(db, 'consultationRequests');
+    const q = query(
+      requestsRef,
+      where('doctorId', '==', doctorId),
+      where('status', '==', 'accepted')
+    );
+
+    const snapshot = await getDocs(q);
+
+    const patientsData: Patient[] = [];
+
+    // Process each accepted request and fetch additional patient data
+    for (const docSnapshot of snapshot.docs) {
+      const data = docSnapshot.data();
+      console.log('Accepted request document:', docSnapshot.id, data);
+          
+      // Fetch additional patient data from patients collection
+      let enhancedPatientProfile = data.fullPatientProfile || {
+        name: data.patientName || 'Unknown Patient',
+        age: undefined,
+        gender: undefined,
+        phoneNumber: data.patientPhone,
+        address: undefined,
+        medicalHistory: [],
+        allergies: [],
+        currentMedications: [],
+        bloodGroup: undefined,
+        emergencyContact: undefined
+      };
+
+      // Try to fetch complete patient data from patients collection
+      try {
+        if (data.patientId) {
+          const patientDocRef = doc(db, 'patients', data.patientId);
+          const patientDoc = await getDoc(patientDocRef);
+              
+          if (patientDoc.exists()) {
+            const patientData = patientDoc.data();
+            console.log('Enhanced patient data found:', patientData);
+                
+            // Merge the existing profile with fetched patient data
+            enhancedPatientProfile = {
+              ...enhancedPatientProfile,
+              patientId: patientData.patientId || data.patientId,
+              name: patientData.name || enhancedPatientProfile.name,
+              assessmentData: patientData.assessmentData || enhancedPatientProfile.assessmentData,
+              registrationDate: patientData.registrationDate || patientData.createdAt,
+              profileCompleted: patientData.profileCompleted,
+              status: patientData.status || 'active',
+              ...(patientData.assessmentData && {
+                gender: patientData.assessmentData.gender || enhancedPatientProfile.gender,
+                phoneNumber: enhancedPatientProfile.phoneNumber || patientData.assessmentData.phoneNumber,
+                address: patientData.assessmentData.location || enhancedPatientProfile.address,
+              })
+            };
+          }
+        }
+      } catch (patientFetchError) {
+        console.warn('Could not fetch enhanced patient data:', patientFetchError);
+      }
+          
+      patientsData.push({
+        id: docSnapshot.id,
+        patientId: data.patientId || '',
+        patientName: data.patientName || 'Unknown Patient',
+        patientEmail: data.patientEmail || '',
+        patientPhone: data.patientPhone,
+        requestType: data.requestType || 'consultation',
+        acceptedAt: data.respondedAt || data.requestedAt || new Date().toISOString(),
+        doctorId: data.doctorId || '',
+        doctorName: data.doctorName || '',
+        doctorEmail: data.doctorEmail || '',
+        fullPatientProfile: enhancedPatientProfile
+      });
     }
 
-    console.log('Fetching accepted patients for doctor:', currentUser.uid);
+    // Remove duplicates based on patientId
+    const uniquePatients = patientsData.filter((patient, index, self) => 
+      index === self.findIndex((p) => p.patientId === patient.patientId)
+    );
 
-    const fetchAcceptedPatients = async () => {
-      try {
-        const requestsRef = collection(db, 'consultationRequests');
-        const q = query(
-          requestsRef, 
-          where('doctorId', '==', currentUser.uid),
-          where('status', '==', 'accepted')
-        );
+    return uniquePatients;
+  };
 
-        const snapshot = await getDocs(q);
-        console.log('Received accepted requests, documents:', snapshot.size);
-        
-        const patientsData: Patient[] = [];
-        
-        // Process each accepted request and fetch additional patient data
-        for (const docSnapshot of snapshot.docs) {
-          const data = docSnapshot.data();
-          console.log('Accepted request document:', docSnapshot.id, data);
-          
-          // Fetch additional patient data from patients collection
-          let enhancedPatientProfile = data.fullPatientProfile || {
-            name: data.patientName || 'Unknown Patient',
-            age: undefined,
-            gender: undefined,
-            phoneNumber: data.patientPhone,
-            address: undefined,
-            medicalHistory: [],
-            allergies: [],
-            currentMedications: [],
-            bloodGroup: undefined,
-            emergencyContact: undefined
-          };
+  // `isPending` is only true on the very first load for this doctor. On later
+  // visits the cached list renders immediately while a refetch runs in the
+  // background, so switching tabs no longer flashes a full-page loader.
+  const { data, isPending, isError } = useQuery({
+    queryKey: ['acceptedPatients', doctorId],
+    queryFn: fetchAcceptedPatients,
+    enabled: Boolean(doctorId),
+    refetchInterval: 60000,
+  });
 
-          // Try to fetch complete patient data from patients collection
-          try {
-            if (data.patientId) {
-              const patientDocRef = doc(db, 'patients', data.patientId);
-              const patientDoc = await getDoc(patientDocRef);
-              
-              if (patientDoc.exists()) {
-                const patientData = patientDoc.data();
-                console.log('Enhanced patient data found:', patientData);
-                
-                // Merge the existing profile with fetched patient data
-                enhancedPatientProfile = {
-                  ...enhancedPatientProfile,
-                  patientId: patientData.patientId || data.patientId,
-                  name: patientData.name || enhancedPatientProfile.name,
-                  assessmentData: patientData.assessmentData || enhancedPatientProfile.assessmentData,
-                  registrationDate: patientData.registrationDate || patientData.createdAt,
-                  profileCompleted: patientData.profileCompleted,
-                  status: patientData.status || 'active',
-                  ...(patientData.assessmentData && {
-                    gender: patientData.assessmentData.gender || enhancedPatientProfile.gender,
-                    phoneNumber: enhancedPatientProfile.phoneNumber || patientData.assessmentData.phoneNumber,
-                    address: patientData.assessmentData.location || enhancedPatientProfile.address,
-                  })
-                };
-              }
-            }
-          } catch (patientFetchError) {
-            console.warn('Could not fetch enhanced patient data:', patientFetchError);
-          }
-          
-          patientsData.push({
-            id: docSnapshot.id,
-            patientId: data.patientId || '',
-            patientName: data.patientName || 'Unknown Patient',
-            patientEmail: data.patientEmail || '',
-            patientPhone: data.patientPhone,
-            requestType: data.requestType || 'consultation',
-            acceptedAt: data.respondedAt || data.requestedAt || new Date().toISOString(),
-            doctorId: data.doctorId || '',
-            doctorName: data.doctorName || '',
-            doctorEmail: data.doctorEmail || '',
-            fullPatientProfile: enhancedPatientProfile
-          });
-        }
+  const patients = useMemo(() => data ?? [], [data]);
 
-        // Remove duplicates based on patientId
-        const uniquePatients = patientsData.filter((patient, index, self) => 
-          index === self.findIndex((p) => p.patientId === patient.patientId)
-        );
-
-        console.log('Processed unique accepted patients:', uniquePatients.length);
-        setPatients(uniquePatients);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching accepted patients:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load patients. Please try again.',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-      }
-    };
-
-    fetchAcceptedPatients();
-
-    // Set up periodic refresh every 60 seconds
-    const interval = setInterval(fetchAcceptedPatients, 60000);
-    
-    return () => clearInterval(interval);
-  }, [toast]);
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load patients. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [isError, toast]);
 
   useEffect(() => {
     applyFilters();
@@ -354,7 +345,7 @@ const Patients: React.FC = () => {
     );
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex-1 p-6">
         <div className="flex items-center justify-center min-h-[60vh]">
