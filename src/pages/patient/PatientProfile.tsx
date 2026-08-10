@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,11 +77,10 @@ interface PatientData {
 export default function Profile() {
   const { user, setUser } = useApp();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [originalData, setOriginalData] = useState<AssessmentData | null>(null);
-  const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [patientIdCopied, setPatientIdCopied] = useState(false);
 
   const [feedbackData, setFeedbackData] = useState({
@@ -89,55 +89,41 @@ export default function Profile() {
     category: "general" as "general" | "features" | "bug" | "suggestion"
   });
 
-  // Fetch patient data including patient ID and assessment data from Firebase
+  // Fetch patient data including patient ID and assessment data from Firebase.
+  // Cached per user, so revisiting this tab shows the profile straight away
+  // instead of a full-screen spinner while Firestore is queried again.
+  const patientQueryKey = ["patientProfile", user?.id] as const;
+
+  const { data: patientData, isPending, isError } = useQuery({
+    queryKey: patientQueryKey,
+    enabled: Boolean(user?.id),
+    queryFn: async (): Promise<PatientData | null> => {
+      const patientDocRef = doc(db, "patients", user!.id);
+      const patientDoc = await getDoc(patientDocRef);
+      return patientDoc.exists() ? (patientDoc.data() as PatientData) : null;
+    },
+  });
+
+  // Seed the editable form from the fetched profile, but never overwrite edits
+  // that are in progress when a background refetch lands.
   useEffect(() => {
-    const fetchPatientData = async () => {
-      if (!user?.id) return;
+    if (isEditing) return;
+    const assessment = patientData?.assessmentData as AssessmentData | undefined;
+    if (assessment) {
+      setAssessmentData(assessment);
+      setOriginalData(assessment);
+    }
+  }, [patientData, isEditing]);
 
-      try {
-        setLoading(true);
-        console.log("Fetching patient data for user:", user.id);
-        
-        const patientDocRef = doc(db, "patients", user.id);
-        const patientDoc = await getDoc(patientDocRef);
-
-        if (patientDoc.exists()) {
-          const data = patientDoc.data() as PatientData;
-          console.log("Patient data fetched:", data);
-          
-          // Set the complete patient data
-          setPatientData(data);
-          
-          // Extract assessment data if it exists
-          const assessment = data.assessmentData as AssessmentData;
-          if (assessment) {
-            setAssessmentData(assessment);
-            setOriginalData(assessment);
-          } else {
-            console.log("No assessment data found for patient");
-          }
-        } else {
-          console.log("Patient document not found");
-          toast({
-            title: "Profile Not Found",
-            description: "Your profile could not be found. Please contact support.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching patient data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load profile data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPatientData();
-  }, [user, toast]);
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Error",
+        description: "Failed to load profile data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [isError, toast]);
 
   const handleSave = async () => {
     if (!user?.id || !assessmentData || !patientData) return;
@@ -163,8 +149,10 @@ export default function Profile() {
         });
       }
       
-      // Update local state
-      setPatientData(prev => prev ? { ...prev, ...updateData } : null);
+      // Update cached state
+      queryClient.setQueryData<PatientData | null>(patientQueryKey, prev =>
+        prev ? { ...prev, ...updateData } : null
+      );
       setOriginalData(assessmentData);
       setIsEditing(false);
       
@@ -263,7 +251,7 @@ export default function Profile() {
     }
   };
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

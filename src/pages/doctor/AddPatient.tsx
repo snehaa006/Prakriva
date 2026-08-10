@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -105,7 +106,8 @@ interface ConsultationRequest {
 
 const ConsultationRequests: React.FC = () => {
   const { toast } = useToast();
-  const [requests, setRequests] = useState<ConsultationRequest[]>([]);
+  const queryClient = useQueryClient();
+  const doctorId = auth.currentUser?.uid;
   const [filteredRequests, setFilteredRequests] = useState<ConsultationRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -115,86 +117,76 @@ const ConsultationRequests: React.FC = () => {
   const [responseMessage, setResponseMessage] = useState('');
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [responseType, setResponseType] = useState<'accept' | 'decline'>('accept');
-  const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const fetchRequests = async (): Promise<ConsultationRequest[]> => {
+    const requestsRef = collection(db, 'consultationRequests');
+    const q = query(
+      requestsRef,
+      where('doctorId', '==', doctorId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const requestsData: ConsultationRequest[] = [];
+    snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data();
+
+      requestsData.push({
+        id: docSnapshot.id,
+        patientId: data.patientId || '',
+        patientName: data.patientName || 'Unknown Patient',
+        patientEmail: data.patientEmail || '',
+        patientPhone: data.patientPhone,
+        requestType: data.requestType || 'consultation',
+        urgency: data.urgency || 'medium',
+        preferredConsultationMode: data.preferredConsultationMode,
+        message: data.message,
+        status: data.status || 'pending',
+        requestedAt: data.requestedAt || new Date().toISOString(),
+        doctorId: data.doctorId || '',
+        doctorName: data.doctorName || '',
+        doctorEmail: data.doctorEmail || '',
+        fullPatientProfile: data.fullPatientProfile || {
+          name: data.patientName || 'Unknown Patient',
+          age: undefined,
+          gender: undefined,
+          phoneNumber: data.patientPhone,
+          address: undefined,
+          medicalHistory: [],
+          allergies: [],
+          currentMedications: [],
+          bloodGroup: undefined,
+          emergencyContact: undefined
+        }
+      });
+    });
+
+    return requestsData;
+  };
+
+  const requestsQueryKey = ['consultationRequests', doctorId] as const;
+
+  // Cached across route changes: returning to this tab renders the last known
+  // requests immediately and refreshes them in the background.
+  const { data, isPending, isError } = useQuery({
+    queryKey: requestsQueryKey,
+    queryFn: fetchRequests,
+    enabled: Boolean(doctorId),
+    refetchInterval: 30000,
+  });
+
+  const requests = useMemo(() => data ?? [], [data]);
+
   useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      console.error('No authenticated user');
-      setIsLoading(false);
-      return;
+    if (isError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load consultation requests. Please try again.',
+        variant: 'destructive',
+      });
     }
-
-    console.log('Fetching requests for doctor:', currentUser.uid);
-
-    const fetchRequests = async () => {
-      try {
-        const requestsRef = collection(db, 'consultationRequests');
-        const q = query(
-          requestsRef, 
-          where('doctorId', '==', currentUser.uid)
-        );
-
-        const snapshot = await getDocs(q);
-        console.log('Received requests, documents:', snapshot.size);
-        
-        const requestsData: ConsultationRequest[] = [];
-        snapshot.forEach((docSnapshot) => {
-          const data = docSnapshot.data();
-          console.log('Request document:', docSnapshot.id, data);
-          
-          requestsData.push({
-            id: docSnapshot.id,
-            patientId: data.patientId || '',
-            patientName: data.patientName || 'Unknown Patient',
-            patientEmail: data.patientEmail || '',
-            patientPhone: data.patientPhone,
-            requestType: data.requestType || 'consultation',
-            urgency: data.urgency || 'medium',
-            preferredConsultationMode: data.preferredConsultationMode,
-            message: data.message,
-            status: data.status || 'pending',
-            requestedAt: data.requestedAt || new Date().toISOString(),
-            doctorId: data.doctorId || '',
-            doctorName: data.doctorName || '',
-            doctorEmail: data.doctorEmail || '',
-            fullPatientProfile: data.fullPatientProfile || {
-              name: data.patientName || 'Unknown Patient',
-              age: undefined,
-              gender: undefined,
-              phoneNumber: data.patientPhone,
-              address: undefined,
-              medicalHistory: [],
-              allergies: [],
-              currentMedications: [],
-              bloodGroup: undefined,
-              emergencyContact: undefined
-            }
-          });
-        });
-
-        console.log('Processed requests:', requestsData.length);
-        setRequests(requestsData);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching consultation requests:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load consultation requests. Please try again.',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-      }
-    };
-
-    fetchRequests();
-
-    // Set up periodic refresh every 30 seconds to get new requests
-    const interval = setInterval(fetchRequests, 30000);
-    
-    return () => clearInterval(interval);
-  }, [toast]);
+  }, [isError, toast]);
 
   useEffect(() => {
     applyFilters();
@@ -307,17 +299,19 @@ const ConsultationRequests: React.FC = () => {
 
       await batch.commit();
 
-      // Update local state immediately
-      setRequests(prev => prev.map(req => 
-        req.id === selectedRequest.id 
-          ? { 
-              ...req, 
-              status: responseType === 'accept' ? 'accepted' : 'declined',
-              responseMessage: responseMessage.trim(),
-              respondedAt: timestamp
-            } 
-          : req
-      ));
+      // Update cached state immediately
+      queryClient.setQueryData<ConsultationRequest[]>(requestsQueryKey, prev =>
+        (prev ?? []).map(req =>
+          req.id === selectedRequest.id
+            ? {
+                ...req,
+                status: responseType === 'accept' ? 'accepted' : 'declined',
+                responseMessage: responseMessage.trim(),
+                respondedAt: timestamp
+              }
+            : req
+        )
+      );
 
       toast({
         title: responseType === 'accept' ? 'Request Accepted' : 'Request Declined',
@@ -430,7 +424,7 @@ const ConsultationRequests: React.FC = () => {
     return age;
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex-1 p-6">
         <div className="flex items-center justify-center min-h-[60vh]">

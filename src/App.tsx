@@ -34,7 +34,18 @@ import Settings from "./pages/patient/Settings";
 import DoctorProfile from "./pages/doctor/DoctorProfile";
 import ConsultDoctor from "./components/ConsultDoctor";
 
-const queryClient = new QueryClient();
+// Cached data survives route changes, so switching tabs renders instantly from
+// cache and refetches in the background instead of showing a blocking loader.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 // --- Loading Component ---
 const LoadingScreen = ({ message = "Loading..." }: { message?: string }) => (
