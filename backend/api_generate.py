@@ -464,7 +464,7 @@ async def generate_meal_plan_endpoint(request: GenerateMealPlanRequest, user=Dep
                 dosha_info=dosha_result,
                 daily_calories=daily_calories,
                 days=request.days or 7,
-                model=request.model or os.getenv("DEFAULT_MODEL", "gpt-4"),
+                model=request.model or os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile"),
             )
         except TypeError as te:
             logger.debug(f"Keyword call failed, trying positional call: {te}")
@@ -475,7 +475,7 @@ async def generate_meal_plan_endpoint(request: GenerateMealPlanRequest, user=Dep
                     dosha_result,
                     daily_calories,
                     request.days or 7,
-                    request.model or os.getenv("DEFAULT_MODEL", "gpt-4"),
+                    request.model or os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile"),
                 )
             except Exception as e:
                 logger.error(f"Meal planner failed with positional call: {e}")
@@ -526,8 +526,8 @@ async def get_config(user=Depends(verify_doctor)):
         "food_dataset_loaded": FOOD_DATASET is not None,
         "food_dataset_size": len(FOOD_DATASET) if FOOD_DATASET is not None else 0,
         "firebase_key_exists": os.path.exists(os.getenv("FIREBASE_KEY_PATH", "")),
-        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "default_model": os.getenv("DEFAULT_MODEL", "gpt-4"),
+        "groq_configured": bool(os.getenv("GROQ_API_KEY")),
+        "default_model": os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile"),
         "available_columns": list(FOOD_DATASET.columns) if FOOD_DATASET is not None else [],
     }
 

@@ -20,7 +20,15 @@ class Settings:
         self.PORT = int(os.getenv("PORT", 5001))
         
         # API Keys
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        # Groq supports multiple keys for rotation/fallback:
+        # GROQ_API_KEY, GROQ_API_KEY2, GROQ_API_KEY3
+        self.GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+        self.GROQ_API_KEY2 = os.getenv("GROQ_API_KEY2", "")
+        self.GROQ_API_KEY3 = os.getenv("GROQ_API_KEY3", "")
+        self.GROQ_API_KEYS = [
+            key for key in (self.GROQ_API_KEY, self.GROQ_API_KEY2, self.GROQ_API_KEY3) if key
+        ]
+        self.GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
         self.FIREBASE_KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "firebase_key.json")
         
         # Database settings
@@ -38,7 +46,7 @@ class Settings:
         self.LIFESTYLE_DATASET_PATH = os.getenv("LIFESTYLE_DATASET_PATH", "data/lifestyle_dataset.csv")
         
         # LLM settings
-        self.DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-4")
+        self.DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile")
         self.MAX_TOKENS = int(os.getenv("MAX_TOKENS", 2000))
         self.TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
         self.FOOD_SNIPPET_ROWS = int(os.getenv("FOOD_SNIPPET_ROWS", 60))
@@ -55,12 +63,17 @@ class Settings:
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
         self.LOG_FORMAT = os.getenv("LOG_FORMAT", "{time} | {level} | {message}")
     
-    def validate_openai_key(self):
-        """Validate OpenAI API key"""
-        if not self.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        if not self.OPENAI_API_KEY.startswith("sk-"):
-            raise ValueError("Invalid OpenAI API key format")
+    def validate_groq_key(self):
+        """Validate Groq API key(s)"""
+        if not self.GROQ_API_KEYS:
+            raise ValueError("GROQ_API_KEY environment variable is required")
+        for name, key in (
+            ("GROQ_API_KEY", self.GROQ_API_KEY),
+            ("GROQ_API_KEY2", self.GROQ_API_KEY2),
+            ("GROQ_API_KEY3", self.GROQ_API_KEY3),
+        ):
+            if key and not key.startswith("gsk_"):
+                raise ValueError(f"Invalid Groq API key format for {name}")
     
     def validate_firebase_path(self):
         """Validate Firebase key path"""
@@ -71,7 +84,7 @@ class Settings:
     
     def validate_all(self):
         """Validate all critical settings"""
-        self.validate_openai_key()
+        self.validate_groq_key()
         self.validate_firebase_path()
 
 

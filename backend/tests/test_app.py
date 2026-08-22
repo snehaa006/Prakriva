@@ -55,7 +55,7 @@ def sample_meal_plan_request(sample_user_profile):
     return {
         "user_profile": sample_user_profile,
         "days": 7,
-        "model": "gpt-4"
+        "model": "llama-3.3-70b-versatile"
     }
 
 

@@ -52,7 +52,7 @@ class ProductionRunner:
         logger.info("Validating environment configuration...")
         
         required_env_vars = [
-            'OPENAI_API_KEY',
+            'GROQ_API_KEY',
             'FIREBASE_KEY_PATH'
         ]
         
