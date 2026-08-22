@@ -9,10 +9,10 @@ import pandas as pd
 from typing import Dict, Optional, Tuple, Any
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-from openai import OpenAI
 from loguru import logger
 
 from config import settings
+from llm_client import groq_client
 from models import UserProfile, DoshaResult, DoshaEnum
 from exceptions import ModelError, DoshaPredictionError, LLMError
 
@@ -21,7 +21,7 @@ class DoshaPredictor:
     """Enhanced dosha predictor with ML + LLM hybrid approach"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = groq_client
         self.ml_model = None
         self.label_encoder = None
         self.feature_encoders = {}
@@ -190,7 +190,7 @@ class DoshaPredictor:
             # Build comprehensive prompt
             prompt = self._build_dosha_prompt(user_profile, dosha_df)
             
-            response = self.client.chat.completions.create(
+            response = self.client.chat_completion(
                 model=model,
                 messages=[
                     {
@@ -429,7 +429,7 @@ def predict_dosha_ml(user_profile: UserProfile, model=None, label_encoder=None,
         return "Unknown"
 
 
-def predict_dosha_llm(user_profile: UserProfile, dosha_df=None, model="gpt-4") -> Dict:
+def predict_dosha_llm(user_profile: UserProfile, dosha_df=None, model=None) -> Dict:
     """Backward compatible LLM prediction function"""
     try:
         if isinstance(user_profile, dict):

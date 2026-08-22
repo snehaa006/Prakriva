@@ -82,7 +82,7 @@ class UserProfile(BaseModel):
 class MealPlanRequest(BaseModel):
     user_profile: UserProfile = Field(..., description="User profile data")
     days: int = Field(7, ge=1, le=30, description="Number of days for meal plan")
-    model: str = Field("gpt-4", description="LLM model to use")
+    model: str = Field("llama-3.3-70b-versatile", description="LLM model to use")
     preferences: Optional[Dict[str, Any]] = Field(None, description="Additional preferences")
 
 

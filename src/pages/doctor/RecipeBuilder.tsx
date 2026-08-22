@@ -391,7 +391,7 @@ const RecipeBuilder = () => {
       const requestPayload = {
         user_profile: profile,
         days: parseInt(planDuration.split(' ')[0]),
-        model: "gpt-4",
+        model: "llama-3.3-70b-versatile",
       };
 
       console.log("📤 Sending AI plan payload:", requestPayload);

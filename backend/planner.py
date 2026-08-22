@@ -5,10 +5,10 @@ import os
 import json
 import re
 from typing import Dict, List, Optional, Any, Union
-from openai import OpenAI
 from loguru import logger
 
 from config import settings
+from llm_client import groq_client
 from models import UserProfile, DoshaResult, MealPlan, MealItem, DayMeals
 from filter_and_score import filter_foods_for_user, make_food_snippet, score_and_rank_foods
 from exceptions import MealPlanGenerationError, LLMError
@@ -18,7 +18,7 @@ class MealPlanner:
     """Enhanced meal planner with multiple strategies"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = groq_client
         self.fallback_templates = self._load_fallback_templates()
     
     def _load_fallback_templates(self) -> Dict[str, List[Dict]]:
@@ -301,7 +301,7 @@ Return simple JSON with day_1, day_2, etc. and totals."""
         """Call LLM and parse response with error handling"""
         
         try:
-            response = self.client.chat.completions.create(
+            response = self.client.chat_completion(
                 model=model,
                 messages=[
                     {
@@ -502,7 +502,7 @@ def generate_meal_plan_llm(
     dosha_info: Union[DoshaResult, Dict],
     daily_calories: float,
     days: int = 7,
-    model: str = "gpt-4",
+    model: str = None,
     food_snippet_rows: int = 60,
     max_tokens: int = 2000,
     temperature: float = 0.7
